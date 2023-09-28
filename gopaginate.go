@@ -5,25 +5,33 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
+	"regexp"
 	"strconv"
 )
 
 func New(db *pgxpool.Pool, sql string, r *http.Request) (int16, int16, int16, int16, int16, int16, int16, error) {
 	pageParam := r.URL.Query().Get("page")
 	limitParam := r.URL.Query().Get("limit")
+
+	cleanPage := regexp.MustCompile("[^0-9]+")
+	cleanLimit := regexp.MustCompile("[^0-9]+")
+
+	finalPageParam := cleanPage.ReplaceAllString(pageParam, "")
+	finalLimitParam := cleanLimit.ReplaceAllString(limitParam, "")
+
 	var errPagination error
-	if pageParam == "" || pageParam == "0" {
-		pageParam = "1"
+	if finalPageParam == "" || finalPageParam == "0" {
+		finalPageParam = "1"
 	}
-	if limitParam == "" || limitParam == "0" {
-		limitParam = "10"
+	if finalLimitParam == "" || finalLimitParam == "0" {
+		finalLimitParam = "10"
 	}
 
-	currentPage, errParsePage := strconv.ParseInt(pageParam, 10, 64)
+	currentPage, errParsePage := strconv.ParseInt(finalPageParam, 10, 64)
 	if errParsePage != nil {
 		errPagination = errors.New("error parse page")
 	}
-	limit, errParseLimit := strconv.ParseInt(limitParam, 10, 64)
+	limit, errParseLimit := strconv.ParseInt(finalLimitParam, 10, 64)
 	if errParseLimit != nil {
 		errPagination = errors.New("error parse limit")
 	}
@@ -40,8 +48,11 @@ func New(db *pgxpool.Pool, sql string, r *http.Request) (int16, int16, int16, in
 	isNextPage := getNextPage(totalPages, int16(nextPage))
 	isPrevPage := getPrevPage(int16(prevPage))
 	totalData := totalCount
+	finalCurrentPage := int16(currentPage)
+	finalLimit := int16(limit)
+	finalOffset := int16(offSet)
 
-	return int16(currentPage), int16(limit), int16(offSet), totalPages, isNextPage, isPrevPage, totalData, errPagination
+	return finalCurrentPage, finalLimit, finalOffset, totalPages, isNextPage, isPrevPage, totalData, errPagination
 }
 func getTotalUsersCount(ctx context.Context, db *pgxpool.Pool, sql string) (int16, error) {
 	var count int16
